@@ -6,20 +6,150 @@ import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 // Temel API URL'si
 // !!! Burayı kendi Node.js sunucu adresinize göre ayarlayın.
 // Genellikle masaüstü/web için 'http://localhost:3000/api' çalışır.
 // Android emülatöründe test ediyorsanız 'http://10.0.2.2:3000/api' kullanmanız gerekebilir.
 // Gerçek cihazlarda bilgisayarın IP adresini kullanın
-const String apiUrl = 'http://192.168.1.102:3000/api';
+const String apiUrl = 'https://yazilimarkadasim.onrender.com/api';
 
-void main() {
+// Bildirim servisi
+class NotificationService {
+  static final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  
+  static Future<void> initialize() async {
+    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+    
+    const DarwinInitializationSettings initializationSettingsIOS = DarwinInitializationSettings(
+      requestSoundPermission: true,
+      requestBadgePermission: true,
+      requestAlertPermission: true,
+    );
+    
+    const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsIOS,
+    );
+    
+    await _flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  }
+  
+  static Future<void> showNotification({
+    required int id,
+    required String title,
+    required String body,
+  }) async {
+    const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
+      'friend_app_channel',
+      'Friend App Notifications',
+      channelDescription: 'Notifications for friend app',
+      importance: Importance.max,
+      priority: Priority.high,
+      sound: RawResourceAndroidNotificationSound('notification'),
+      playSound: true,
+    );
+    
+    const DarwinNotificationDetails iOSPlatformChannelSpecifics = DarwinNotificationDetails(
+      sound: 'default',
+    );
+    
+    const NotificationDetails platformChannelSpecifics = NotificationDetails(
+      android: androidPlatformChannelSpecifics,
+      iOS: iOSPlatformChannelSpecifics,
+    );
+    
+    await _flutterLocalNotificationsPlugin.show(
+      id,
+      title,
+      body,
+      platformChannelSpecifics,
+    );
+  }
+}
+
+// Firebase background message handler
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  await NotificationService.showNotification(
+    id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+    title: message.notification?.title ?? 'Yeni Bildirim',
+    body: message.notification?.body ?? 'Yeni bir mesajınız var',
+  );
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  await NotificationService.initialize();
+  
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    _initializeFirebaseMessaging();
+  }
+
+  void _initializeFirebaseMessaging() async {
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+    
+    // Permission request
+    NotificationSettings settings = await messaging.requestPermission(
+      alert: true,
+      announcement: false,
+      badge: true,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+      sound: true,
+    );
+
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      print('User granted permission');
+    } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
+      print('User granted provisional permission');
+    } else {
+      print('User declined or has not accepted permission');
+    }
+
+    // Handle foreground messages
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      print('Got a message whilst in the foreground!');
+      print('Message data: ${message.data}');
+
+      if (message.notification != null) {
+        NotificationService.showNotification(
+          id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+          title: message.notification!.title ?? 'Yeni Bildirim',
+          body: message.notification!.body ?? 'Yeni bir mesajınız var',
+        );
+      }
+    });
+
+    // Handle when app is opened via notification
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      print('A new onMessageOpenedApp event was published!');
+      // Navigate to specific screen if needed
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -363,7 +493,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('$apiUrl/register'),
+  Uri.parse('$apiUrl/register'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'username': username,
@@ -664,7 +794,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('$apiUrl/login'),
+  Uri.parse('$apiUrl/login'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'email': email,
@@ -1459,6 +1589,127 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _showLikesList(List<dynamic> likes) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.6,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF2196F3), Color(0xFF21CBF3)],
+                ),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Beğenenler',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: likes.isEmpty
+                  ? const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.favorite_border, size: 64, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text(
+                            'Henüz beğeni yok',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: likes.length,
+                      itemBuilder: (context, index) {
+                        final like = likes[index];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[50],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                decoration: const BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [Color(0xFF2196F3), Color(0xFF21CBF3)],
+                                  ),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: CircleAvatar(
+                                  backgroundColor: Colors.transparent,
+                                  backgroundImage: like['userProfilePicture'] != null
+                                      ? MemoryImage(base64Decode(like['userProfilePicture'].split(',').last))
+                                      : null,
+                                  child: like['userProfilePicture'] == null
+                                      ? const Icon(Icons.person, color: Colors.white)
+                                      : null,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  like['username'] ?? 'Bilinmeyen Kullanıcı',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                              const Icon(
+                                Icons.favorite,
+                                color: Color(0xFFE91E63),
+                                size: 20,
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return _isLoadingPosts
@@ -1974,19 +2225,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                       // Fotoğrafı büyütülmüş halde göster
                                       showDialog(
                                         context: context,
+                                        barrierColor: Colors.black87,
                                         builder: (BuildContext context) {
-                                          return Dialog(
+                                          return Scaffold(
                                             backgroundColor: Colors.transparent,
-                                            child: Stack(
+                                            body: Stack(
                                               children: [
+                                                // Fotoğraf
                                                 Center(
-                                                  child: Container(
-                                                    constraints: BoxConstraints(
-                                                      maxHeight: MediaQuery.of(context).size.height * 0.8,
-                                                      maxWidth: MediaQuery.of(context).size.width * 0.9,
-                                                    ),
-                                                    child: ClipRRect(
-                                                      borderRadius: BorderRadius.circular(15),
+                                                  child: InteractiveViewer(
+                                                    child: Container(
+                                                      width: double.infinity,
+                                                      height: double.infinity,
+                                                      color: Colors.transparent,
                                                       child: Image.memory(
                                                         base64Decode(post['imageUrl'].split(',').last),
                                                         fit: BoxFit.contain,
@@ -1994,13 +2245,21 @@ class _HomeScreenState extends State<HomeScreen> {
                                                     ),
                                                   ),
                                                 ),
+                                                // Kapatma butonu - Her zaman sağ üst köşede sabit
                                                 Positioned(
-                                                  top: 40,
-                                                  right: 40,
+                                                  top: MediaQuery.of(context).padding.top + 10,
+                                                  right: 20,
                                                   child: Container(
                                                     decoration: BoxDecoration(
                                                       color: Colors.black.withOpacity(0.7),
                                                       borderRadius: BorderRadius.circular(20),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: Colors.black.withOpacity(0.3),
+                                                          blurRadius: 8,
+                                                          offset: const Offset(0, 2),
+                                                        ),
+                                                      ],
                                                     ),
                                                     child: IconButton(
                                                       icon: const Icon(
@@ -2129,6 +2388,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         borderRadius: BorderRadius.circular(25),
                                         onTap: () => _toggleLike(
                                             post['id'], post['likes']),
+                                        onLongPress: () => _showLikesList(post['likes']),
                                         child: Padding(
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 16,
@@ -2411,6 +2671,124 @@ class _CommentScreenState extends State<CommentScreen> {
     }
   }
 
+  Future<void> _editComment(String commentId, String currentContent) async {
+    TextEditingController editController = TextEditingController(text: currentContent);
+    
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Yorumu Düzenle'),
+        content: TextField(
+          controller: editController,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Yorumunuzu düzenleyin...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (editController.text.isNotEmpty) {
+                Navigator.pop(context);
+                await _updateComment(commentId, editController.text);
+              }
+            },
+            child: const Text('Kaydet'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateComment(String commentId, String content) async {
+    try {
+      final token = await _getToken();
+      if (token == null) return;
+
+      final response = await http.put(
+        Uri.parse('$apiUrl/comments/$commentId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({'content': content}),
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Yorum güncellendi')),
+        );
+        _fetchComments();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Yorum güncellenemedi')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Hata: $e')),
+      );
+    }
+  }
+
+  Future<void> _deleteComment(String commentId) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Yorumu Sil'),
+        content: const Text('Bu yorumu silmek istediğinizden emin misiniz?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        final token = await _getToken();
+        if (token == null) return;
+
+        final response = await http.delete(
+          Uri.parse('$apiUrl/comments/$commentId'),
+          headers: {'Authorization': 'Bearer $token'},
+        );
+
+        if (response.statusCode == 200) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Yorum silindi')),
+          );
+          _fetchComments();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Yorum silinemedi')),
+          );
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: $e')),
+        );
+      }
+    }
+  }
+
+  Future<String?> _getCurrentUserId() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_id');
+  }
+
   String _formatDate(String dateString) {
     DateTime dateTime = DateTime.parse(dateString);
     return "${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute}";
@@ -2527,96 +2905,147 @@ class _CommentScreenState extends State<CommentScreen> {
                             itemCount: _comments.length,
                             itemBuilder: (context, index) {
                               final comment = _comments[index];
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      Colors.white,
-                                      Color(0xFFFAFAFA),
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.05),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
+                              return FutureBuilder<String?>(
+                                future: _getCurrentUserId(),
+                                builder: (context, snapshot) {
+                                  final currentUserId = snapshot.data;
+                                  final isOwner = currentUserId == comment['userId'];
+                                  
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          Colors.white,
+                                          Color(0xFFFAFAFA),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(16),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.05),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16.0),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Container(
-                                            decoration: BoxDecoration(
-                                              gradient: const LinearGradient(
-                                                colors: [
-                                                  Color(0xFF2196F3),
-                                                  Color(0xFF21CBF3),
-                                                ],
+                                          Row(
+                                            children: [
+                                              // Profil fotoğrafı
+                                              Container(
+                                                decoration: BoxDecoration(
+                                                  gradient: const LinearGradient(
+                                                    colors: [
+                                                      Color(0xFF2196F3),
+                                                      Color(0xFF21CBF3),
+                                                    ],
+                                                  ),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: CircleAvatar(
+                                                  backgroundColor: Colors.transparent,
+                                                  backgroundImage: comment['userProfilePicture'] != null
+                                                      ? MemoryImage(base64Decode(comment['userProfilePicture'].split(',').last))
+                                                      : null,
+                                                  child: comment['userProfilePicture'] == null
+                                                      ? const Icon(
+                                                          Icons.person,
+                                                          color: Colors.white,
+                                                        )
+                                                      : null,
+                                                ),
                                               ),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const CircleAvatar(
-                                              backgroundColor: Colors.transparent,
-                                              child: Icon(
-                                                Icons.person,
-                                                color: Colors.white,
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      comment['username'],
+                                                      style: const TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 16,
+                                                        color: Color(0xFF2196F3),
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      _formatDate(comment['createdAt']),
+                                                      style: TextStyle(
+                                                        color: Colors.grey[600],
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
-                                            ),
+                                              // Düzenle/Sil butonu (sadece yorum sahibi görebilir)
+                                              if (isOwner)
+                                                PopupMenuButton<String>(
+                                                  onSelected: (value) {
+                                                    if (value == 'edit') {
+                                                      _editComment(comment['id'], comment['content']);
+                                                    } else if (value == 'delete') {
+                                                      _deleteComment(comment['id']);
+                                                    }
+                                                  },
+                                                  itemBuilder: (context) => [
+                                                    const PopupMenuItem(
+                                                      value: 'edit',
+                                                      child: Row(
+                                                        children: [
+                                                          Icon(Icons.edit, size: 20),
+                                                          SizedBox(width: 8),
+                                                          Text('Düzenle'),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    const PopupMenuItem(
+                                                      value: 'delete',
+                                                      child: Row(
+                                                        children: [
+                                                          Icon(Icons.delete, size: 20, color: Colors.red),
+                                                          SizedBox(width: 8),
+                                                          Text('Sil', style: TextStyle(color: Colors.red)),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                  child: const Icon(
+                                                    Icons.more_vert,
+                                                    color: Colors.grey,
+                                                  ),
+                                                ),
+                                            ],
                                           ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  comment['username'],
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 16,
-                                                    color: Color(0xFF2196F3),
-                                                  ),
-                                                ),
-                                                Text(
-                                                  _formatDate(comment['createdAt']),
-                                                  style: TextStyle(
-                                                    color: Colors.grey[600],
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                              ],
+                                          const SizedBox(height: 12),
+                                          Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFF8F9FA),
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Text(
+                                              comment['content'],
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                height: 1.4,
+                                                color: Color(0xFF333333),
+                                              ),
                                             ),
                                           ),
                                         ],
                                       ),
-                                      const SizedBox(height: 12),
-                                      Container(
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFF8F9FA),
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Text(
-                                          comment['content'],
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            height: 1.4,
-                                            color: Color(0xFF333333),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                    ),
+                                  );
+                                },
                               );
                             },
                           ),

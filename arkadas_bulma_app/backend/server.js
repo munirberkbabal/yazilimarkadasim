@@ -331,6 +331,42 @@ app.post('/api/posts', authenticateToken, upload.single('postImage'), async (req
 app.post('/api/posts/:postId/like', authenticateToken, (req, res) => {
     const { postId } = req.params;
     const userId = req.user.id;
+    const username = req.user.username;
+    const posts = readData(postsFilePath);
+    const postIndex = posts.findIndex(p => p.id === postId);
+
+    if (postIndex === -1) {
+        return res.status(404).json({ message: 'Gönderi bulunamadı.' });
+    }
+
+    // Kullanıcı bilgilerini al
+    const users = readData(usersFilePath);
+    const user = users.find(u => u.id === userId);
+
+    const post = posts[postIndex];
+    const likeIndex = post.likes.findIndex(like => like.userId === userId);
+
+    if (likeIndex === -1) {
+        // Beğen
+        post.likes.push({
+            userId,
+            username,
+            userProfilePicture: user ? user.profilePicture : null
+        });
+        res.json({ message: 'Gönderi beğenildi.', liked: true });
+    } else {
+        // Beğeniyi geri al
+        post.likes.splice(likeIndex, 1);
+        res.json({ message: 'Gönderi beğenisi geri alındı.', liked: false });
+    }
+
+    writeData(postsFilePath, posts);
+});
+
+// Unlike endpoint (ayrı endpoint olarak)
+app.post('/api/posts/:postId/unlike', authenticateToken, (req, res) => {
+    const { postId } = req.params;
+    const userId = req.user.id;
     const posts = readData(postsFilePath);
     const postIndex = posts.findIndex(p => p.id === postId);
 
@@ -339,17 +375,15 @@ app.post('/api/posts/:postId/like', authenticateToken, (req, res) => {
     }
 
     const post = posts[postIndex];
-    const likeIndex = post.likes.indexOf(userId);
+    const likeIndex = post.likes.findIndex(like => like.userId === userId);
 
-    if (likeIndex === -1) {
-        post.likes.push(userId); // Beğen
-        res.json({ message: 'Gönderi beğenildi.', liked: true });
-    } else {
-        post.likes.splice(likeIndex, 1); // Beğeniyi geri al
+    if (likeIndex !== -1) {
+        post.likes.splice(likeIndex, 1);
+        writeData(postsFilePath, posts);
         res.json({ message: 'Gönderi beğenisi geri alındı.', liked: false });
+    } else {
+        res.json({ message: 'Zaten beğenmemişsiniz.', liked: false });
     }
-
-    writeData(postsFilePath, posts);
 });
 
 // server.js dosyanızda mevcut rotaların arasına ekleyin
@@ -420,10 +454,15 @@ app.post('/api/posts/:postId/comments', authenticateToken, (req, res) => {
         return res.status(404).json({ message: 'Gönderi bulunamadı.' });
     }
 
+    // Kullanıcı bilgilerini al (profil fotoğrafı için)
+    const users = readData(usersFilePath);
+    const user = users.find(u => u.id === userId);
+
     const newComment = {
         id: uuidv4(),
         userId,
         username,
+        userProfilePicture: user ? user.profilePicture : null,
         content,
         createdAt: new Date().toISOString()
     };
@@ -450,6 +489,82 @@ app.get('/api/posts/:postId/comments', authenticateToken, (req, res) => {
     }
 
     res.json(post.comments || []); // Yorumları döndür, yoksa boş dizi
+});
+
+// Yorum Düzenle
+app.put('/api/comments/:commentId', authenticateToken, (req, res) => {
+    const { commentId } = req.params;
+    const { content } = req.body;
+    const userId = req.user.id;
+
+    if (!content) {
+        return res.status(400).json({ message: 'Yorum içeriği boş olamaz.' });
+    }
+
+    const posts = readData(postsFilePath);
+    let commentFound = false;
+    let updatedComment = null;
+
+    // Tüm gönderilerde yorumu ara
+    for (let post of posts) {
+        if (post.comments) {
+            const commentIndex = post.comments.findIndex(c => c.id === commentId);
+            if (commentIndex !== -1) {
+                // Yorumun sahibi olup olmadığını kontrol et
+                if (post.comments[commentIndex].userId !== userId) {
+                    return res.status(403).json({ message: 'Bu yorumu düzenleme yetkiniz yok.' });
+                }
+                
+                // Yorumu güncelle
+                post.comments[commentIndex].content = content;
+                post.comments[commentIndex].updatedAt = new Date().toISOString();
+                updatedComment = post.comments[commentIndex];
+                commentFound = true;
+                break;
+            }
+        }
+    }
+
+    if (!commentFound) {
+        return res.status(404).json({ message: 'Yorum bulunamadı.' });
+    }
+
+    writeData(postsFilePath, posts);
+    res.json({ message: 'Yorum başarıyla güncellendi.', comment: updatedComment });
+});
+
+// Yorum Sil
+app.delete('/api/comments/:commentId', authenticateToken, (req, res) => {
+    const { commentId } = req.params;
+    const userId = req.user.id;
+
+    const posts = readData(postsFilePath);
+    let commentFound = false;
+
+    // Tüm gönderilerde yorumu ara ve sil
+    for (let post of posts) {
+        if (post.comments) {
+            const commentIndex = post.comments.findIndex(c => c.id === commentId);
+            if (commentIndex !== -1) {
+                // Yorumun sahibi olup olmadığını kontrol et
+                if (post.comments[commentIndex].userId !== userId) {
+                    return res.status(403).json({ message: 'Bu yorumu silme yetkiniz yok.' });
+                }
+                
+                // Yorumu sil
+                post.comments.splice(commentIndex, 1);
+                commentFound = true;
+                break;
+            }
+        }
+    }
+
+    if (!commentFound) {
+        return res.status(404).json({ message: 'Yorum bulunamadı.' });
+    }
+
+    writeData(postsFilePath, posts);
+    res.json({ message: 'Yorum başarıyla silindi.' });
 });
 
 // --- Arkadaşlık Uç Noktaları ---
