@@ -488,7 +488,20 @@ app.get('/api/posts/:postId/comments', authenticateToken, (req, res) => {
         return res.status(404).json({ message: 'Gönderi bulunamadı.' });
     }
 
-    res.json(post.comments || []); // Yorumları döndür, yoksa boş dizi
+        // Kullanıcılar dosyasını oku
+        const users = readData(usersFilePath);
+        // Her yorumun userProfilePicture alanını doldur
+        const commentsWithProfile = (post.comments || []).map(comment => {
+            if (!comment.userProfilePicture) {
+                const user = users.find(u => u.id === comment.userId);
+                return {
+                    ...comment,
+                    userProfilePicture: user ? user.profilePicture : null
+                };
+            }
+            return comment;
+        });
+        res.json(commentsWithProfile);
 });
 
 // Yorum Düzenle
