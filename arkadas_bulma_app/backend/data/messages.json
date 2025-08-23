@@ -1,0 +1,23 @@
+[
+  {
+    "id": "df850211-d8f2-407e-a7c4-c850639257b1",
+    "senderId": "a353c097-7df1-4c96-8224-ef6be116d1a5",
+    "receiverId": "08ada1f9-756f-4d10-a237-1ffb0bf26fe4",
+    "content": "sa",
+    "createdAt": "2025-06-25T11:38:31.388Z"
+  },
+  {
+    "id": "7488b408-858e-4918-9e5b-851b1d5be12c",
+    "senderId": "a353c097-7df1-4c96-8224-ef6be116d1a5",
+    "receiverId": "08ada1f9-756f-4d10-a237-1ffb0bf26fe4",
+    "content": "nbyn ln",
+    "createdAt": "2025-06-25T13:23:15.017Z"
+  },
+  {
+    "id": "47d32a85-7ac7-4de4-b18c-e24511aaff95",
+    "senderId": "a353c097-7df1-4c96-8224-ef6be116d1a5",
+    "receiverId": "08ada1f9-756f-4d10-a237-1ffb0bf26fe4",
+    "content": "ucube",
+    "createdAt": "2025-07-04T19:27:56.050Z"
+  }
+]
