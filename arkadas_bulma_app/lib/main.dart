@@ -2388,7 +2388,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                         borderRadius: BorderRadius.circular(25),
                                         onTap: () => _toggleLike(
                                             post['id'], post['likes']),
-                                        onLongPress: () => _showLikesList(post['likes']),
                                         child: Padding(
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 16,
@@ -2427,6 +2426,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                                   fontSize: 12,
                                                 ),
                                               ),
+                                                const SizedBox(width: 8),
+                                                TextButton(
+                                                  style: TextButton.styleFrom(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                                                    minimumSize: Size(0, 24),
+                                                  ),
+                                                  onPressed: () => _showLikesList(post['likes']),
+                                                  child: const Text(
+                                                    'Beğenenleri Görüntüle',
+                                                    style: TextStyle(fontSize: 12, color: Color(0xFF2196F3)),
+                                                  ),
+                                                ),
                                             ],
                                           ),
                                         ),
