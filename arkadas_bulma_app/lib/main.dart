@@ -1685,11 +1685,25 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: Text(
-                                  like['username'] ?? 'Bilinmeyen Kullanıcı',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 16,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    if (like['userId'] != null) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => UserProfileScreen(userId: like['userId']),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  child: Text(
+                                    like['username'] ?? 'Bilinmeyen Kullanıcı',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16,
+                                      color: Color(0xFF2196F3),
+                                      decoration: TextDecoration.underline,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -2979,12 +2993,25 @@ class _CommentScreenState extends State<CommentScreen> {
                                                   crossAxisAlignment:
                                                       CrossAxisAlignment.start,
                                                   children: [
-                                                    Text(
-                                                      comment['username'],
-                                                      style: const TextStyle(
-                                                        fontWeight: FontWeight.bold,
-                                                        fontSize: 16,
-                                                        color: Color(0xFF2196F3),
+                                                    GestureDetector(
+                                                      onTap: () {
+                                                        if (comment['userId'] != null) {
+                                                          Navigator.push(
+                                                            context,
+                                                            MaterialPageRoute(
+                                                              builder: (_) => UserProfileScreen(userId: comment['userId']),
+                                                            ),
+                                                          );
+                                                        }
+                                                      },
+                                                      child: Text(
+                                                        comment['username'],
+                                                        style: const TextStyle(
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: 16,
+                                                          color: Color(0xFF2196F3),
+                                                          decoration: TextDecoration.underline,
+                                                        ),
                                                       ),
                                                     ),
                                                     Text(
@@ -3379,7 +3406,10 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
                         leading: const CircleAvatar(
                           child: Icon(Icons.person),
                         ),
-                        title: Text(request['senderUsername']),
+                        title: ClickableUsername(
+                          userId: request['senderId'],
+                          username: request['senderUsername'],
+                        ),
                         subtitle:
                             const Text('Size arkadaşlık isteği gönderdi.'),
                         trailing: Row(
@@ -3520,7 +3550,10 @@ class _SearchUsersScreenState extends State<SearchUsersScreen> {
                         leading: const CircleAvatar(
                           child: Icon(Icons.person),
                         ),
-                        title: Text(user['username']),
+                        title: ClickableUsername(
+                          userId: user['id'],
+                          username: user['username'],
+                        ),
                         subtitle: Text(user['email']),
                         trailing: IconButton(
                           icon:
