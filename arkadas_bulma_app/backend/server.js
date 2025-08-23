@@ -8,7 +8,7 @@ const { v4: uuidv4 } = require('uuid');
 const multer = require('multer'); // Multer'ı dahil et
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const SECRET_KEY = 'your_super_secret_key'; // Güçlü ve gizli bir anahtar kullanın!
 
 // Middleware
@@ -628,7 +628,6 @@ app.post('/api/messages', authenticateToken, (req, res) => {
 });
 
 // Sunucuyu Başlat
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Sunucu http://localhost:${PORT} adresinde çalışıyor.`);
-    console.log(`Mobil cihazlar için: http://192.168.1.102:${PORT}`);
-    });
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
