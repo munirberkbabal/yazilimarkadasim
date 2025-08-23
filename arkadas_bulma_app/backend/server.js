@@ -10,6 +10,10 @@ const multer = require('multer'); // Multer'ı dahil et
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SECRET_KEY = 'your_super_secret_key'; // Güçlü ve gizli bir anahtar kullanın!
+// Render test endpoint
+app.get('/', (req, res) => {
+    res.send('Backend Render üzerinde çalışıyor 🚀');
+});
 
 // Middleware
 app.use(express.json());
