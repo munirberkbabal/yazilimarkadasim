@@ -245,10 +245,24 @@ app.get('/api/posts', authenticateToken, (req, res) => {
     // Her gönderiye, gönderi sahibinin kullanıcı adı ve profil resmini ekle
     const postsWithUserDetails = posts.map(post => {
         const user = users.find(u => u.id === post.userId);
+        
+        // Beğenenlerin profil fotoğraflarını güncelle
+        const likesWithProfilePics = (post.likes || []).map(like => {
+            if (!like.userProfilePicture) {
+                const likeUser = users.find(u => u.id === like.userId);
+                return {
+                    ...like,
+                    userProfilePicture: likeUser ? likeUser.profilePic : null
+                };
+            }
+            return like;
+        });
+        
         return {
             ...post,
             username: user ? user.username : 'Bilinmeyen Kullanıcı',
-            profilePicUrl: user ? user.profilePic : null // Burası önemli!
+            profilePicUrl: user ? user.profilePic : null,
+            likes: likesWithProfilePics
         };
     }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); // En yeni gönderiler üstte
 
@@ -269,10 +283,24 @@ app.get('/api/posts/:postId', authenticateToken, (req, res) => {
 
     // Gönderi sahibinin kullanıcı adı ve profil resmini ekle
     const user = users.find(u => u.id === post.userId);
+    
+    // Beğenenlerin profil fotoğraflarını güncelle
+    const likesWithProfilePics = (post.likes || []).map(like => {
+        if (!like.userProfilePicture) {
+            const likeUser = users.find(u => u.id === like.userId);
+            return {
+                ...like,
+                userProfilePicture: likeUser ? likeUser.profilePic : null
+            };
+        }
+        return like;
+    });
+    
     const postWithUserDetails = {
         ...post,
         username: user ? user.username : 'Bilinmeyen Kullanıcı',
-        profilePicUrl: user ? user.profilePic : null
+        profilePicUrl: user ? user.profilePic : null,
+        likes: likesWithProfilePics
     };
 
     res.json(postWithUserDetails);
@@ -351,7 +379,7 @@ app.post('/api/posts/:postId/like', authenticateToken, (req, res) => {
         post.likes.push({
             userId,
             username,
-            userProfilePicture: user ? user.profilePicture : null
+            userProfilePicture: user ? user.profilePic : null
         });
         res.json({ message: 'Gönderi beğenildi.', liked: true });
     } else {
@@ -462,7 +490,7 @@ app.post('/api/posts/:postId/comments', authenticateToken, (req, res) => {
         id: uuidv4(),
         userId,
         username,
-        userProfilePicture: user ? user.profilePicture : null,
+        userProfilePicture: user ? user.profilePic : null,
         content,
         createdAt: new Date().toISOString()
     };
@@ -496,7 +524,7 @@ app.get('/api/posts/:postId/comments', authenticateToken, (req, res) => {
                 const user = users.find(u => u.id === comment.userId);
                 return {
                     ...comment,
-                    userProfilePicture: user ? user.profilePicture : null
+                    userProfilePicture: user ? user.profilePic : null
                 };
             }
             return comment;
