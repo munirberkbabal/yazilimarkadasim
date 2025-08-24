@@ -111,6 +111,8 @@ class _MyAppState extends State<MyApp> {
   void _initializeFirebaseMessaging() async {
     FirebaseMessaging messaging = FirebaseMessaging.instance;
     
+    print('Initializing Firebase Messaging...');
+    
     // Permission request
     NotificationSettings settings = await messaging.requestPermission(
       alert: true,
@@ -122,6 +124,8 @@ class _MyAppState extends State<MyApp> {
       sound: true,
     );
 
+    print('Permission status: ${settings.authorizationStatus}');
+
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
       print('User granted permission');
     } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
@@ -130,12 +134,17 @@ class _MyAppState extends State<MyApp> {
       print('User declined or has not accepted permission');
     }
 
+    // Get FCM token for debugging
+    String? token = await messaging.getToken();
+    print('FCM Token: $token');
+
     // Handle foreground messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       print('Got a message whilst in the foreground!');
       print('Message data: ${message.data}');
 
       if (message.notification != null) {
+        print('Showing notification: ${message.notification!.title}');
         NotificationService.showNotification(
           id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
           title: message.notification!.title ?? 'Yeni Bildirim',
@@ -3276,8 +3285,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
                       margin: const EdgeInsets.symmetric(
                           vertical: 4, horizontal: 8),
                       child: ListTile(
-                        leading: const CircleAvatar(
-                          child: Icon(Icons.person),
+                        leading: CircleAvatar(
+                          backgroundImage: friend['profilePic'] != null
+                              ? MemoryImage(base64Decode(friend['profilePic']))
+                              : null,
+                          child: friend['profilePic'] == null
+                              ? const Icon(Icons.person)
+                              : null,
                         ),
                         title: Text(friend['username']),
                         subtitle: Text(friend['bio'] ?? 'Biyografi yok.'),
@@ -4104,7 +4118,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 15),
                     DropdownButtonFormField<String>(
-                      value: _selectedGender,
+                      value: _genders.contains(_selectedGender) ? _selectedGender : null,
                       hint: const Text('Cinsiyet Seçin'),
                       decoration: const InputDecoration(
                         labelText: 'Cinsiyet',
@@ -4124,7 +4138,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 15),
                     DropdownButtonFormField<String>(
-                      value: _selectedSoftwareInterest,
+                      value: _softwareInterests.contains(_selectedSoftwareInterest) ? _selectedSoftwareInterest : null,
                       hint: const Text('Yazılım İlgi Alanı Seçin'),
                       decoration: const InputDecoration(
                         labelText: 'Yazılım İlgi Alanı',
