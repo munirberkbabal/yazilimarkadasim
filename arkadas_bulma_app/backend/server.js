@@ -700,19 +700,31 @@ app.get('/api/friends', authenticateToken, (req, res) => {
     const friendships = readData(friendshipsFilePath);
     const users = readData(usersFilePath);
 
+    console.log('--- Friends Request Debug ---');
+    console.log('User ID:', userId);
+    console.log('All friendships:', JSON.stringify(friendships, null, 2));
+
     const acceptedFriendships = friendships.filter(f =>
         f.status === 'accepted' && (f.senderId === userId || f.receiverId === userId)
     );
 
+    console.log('Accepted friendships for this user:', acceptedFriendships);
+
     const friendInfos = acceptedFriendships.map(f => {
         const friendId = f.senderId === userId ? f.receiverId : f.senderId;
+        console.log('Looking for friend with ID:', friendId);
         const friendUser = users.find(u => u.id === friendId);
         if (friendUser) {
             const { passwordHash, ...safeFriendUser } = friendUser;
+            console.log('Found friend:', safeFriendUser.username);
             return safeFriendUser;
         }
+        console.log('Friend user not found for ID:', friendId);
         return null;
     }).filter(Boolean); // null olanları filtrele
+
+    console.log('Final friend list:', friendInfos);
+    console.log('--- End Friends Debug ---');
 
     res.json(friendInfos);
 });
