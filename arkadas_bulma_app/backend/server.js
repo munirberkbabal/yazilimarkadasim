@@ -351,7 +351,7 @@ app.post('/api/posts/:postId/like', authenticateToken, (req, res) => {
         post.likes.push({
             userId,
             username,
-            userProfilePicture: user ? user.profilePic : null
+            userProfilePicture: user ? user.profilePicture : null
         });
         res.json({ message: 'Gönderi beğenildi.', liked: true });
     } else {
@@ -462,7 +462,7 @@ app.post('/api/posts/:postId/comments', authenticateToken, (req, res) => {
         id: uuidv4(),
         userId,
         username,
-        userProfilePicture: user ? user.profilePic : null,
+        userProfilePicture: user ? user.profilePicture : null,
         content,
         createdAt: new Date().toISOString()
     };
@@ -496,7 +496,7 @@ app.get('/api/posts/:postId/comments', authenticateToken, (req, res) => {
                 const user = users.find(u => u.id === comment.userId);
                 return {
                     ...comment,
-                    userProfilePicture: user ? user.profilePic : null
+                    userProfilePicture: user ? user.profilePicture : null
                 };
             }
             return comment;

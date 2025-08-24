@@ -342,7 +342,7 @@ class _MainScreenState extends State<MainScreen> {
     }
 
     List<Widget> _widgetOptions = <Widget>[
-      HomeScreen(currentUserId: _currentUserId!),
+      HomeScreen(currentUserId: _currentUserId!, currentUsername: _currentUsername!),
       FriendsScreen(currentUserId: _currentUserId!),
       FriendRequestsScreen(currentUserId: _currentUserId!),
       SearchUsersScreen(currentUserId: _currentUserId!),
@@ -1069,8 +1069,9 @@ class _LoginScreenState extends State<LoginScreen> {
 // --- Ana Sayfa ---
 class HomeScreen extends StatefulWidget {
   final String currentUserId;
+  final String currentUsername;
 
-  const HomeScreen({super.key, required this.currentUserId});
+  const HomeScreen({super.key, required this.currentUserId, required this.currentUsername});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -1519,7 +1520,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Optimistic update - UI'ı hemen güncelle
     final currentUserId = widget.currentUserId;
-    final isCurrentlyLiked = likes.contains(currentUserId);
+    final isCurrentlyLiked = likes.any((like) => 
+        like is Map && like['userId'] == currentUserId);
     
     setState(() {
       final postIndex = _posts.indexWhere((post) => post['id'] == postId);
@@ -1528,9 +1530,14 @@ class _HomeScreenState extends State<HomeScreen> {
         final postLikes = List<dynamic>.from(post['likes']);
         
         if (isCurrentlyLiked) {
-          postLikes.remove(currentUserId);
+          postLikes.removeWhere((like) => 
+              like is Map && like['userId'] == currentUserId);
         } else {
-          postLikes.add(currentUserId);
+          postLikes.add({
+            'userId': currentUserId,
+            'username': widget.currentUsername,
+            'userProfilePicture': null // Backend'den gelecek
+          });
         }
         
         _posts[postIndex]['likes'] = postLikes;
@@ -1552,9 +1559,14 @@ class _HomeScreenState extends State<HomeScreen> {
             final postLikes = List<dynamic>.from(post['likes']);
             
             if (isCurrentlyLiked) {
-              postLikes.add(currentUserId);
+              postLikes.add({
+                'userId': currentUserId,
+                'username': widget.currentUsername,
+                'userProfilePicture': null
+              });
             } else {
-              postLikes.remove(currentUserId);
+              postLikes.removeWhere((like) => 
+                  like is Map && like['userId'] == currentUserId);
             }
             
             _posts[postIndex]['likes'] = postLikes;
@@ -1574,9 +1586,14 @@ class _HomeScreenState extends State<HomeScreen> {
           final postLikes = List<dynamic>.from(post['likes']);
           
           if (isCurrentlyLiked) {
-            postLikes.add(currentUserId);
+            postLikes.add({
+              'userId': currentUserId,
+              'username': widget.currentUsername,
+              'userProfilePicture': null
+            });
           } else {
-            postLikes.remove(currentUserId);
+            postLikes.removeWhere((like) => 
+                like is Map && like['userId'] == currentUserId);
           }
           
           _posts[postIndex]['likes'] = postLikes;
@@ -1702,7 +1719,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                       fontWeight: FontWeight.w600,
                                       fontSize: 16,
                                       color: Color(0xFF2196F3),
-                                      decoration: TextDecoration.underline,
                                     ),
                                   ),
                                 ),
@@ -2053,7 +2069,8 @@ class _HomeScreenState extends State<HomeScreen> {
               else
                 // Posts
                 ..._posts.map((post) {
-                  bool isLiked = post['likes'].contains(widget.currentUserId);
+                  bool isLiked = post['likes'].any((like) => 
+                      like is Map && like['userId'] == widget.currentUserId);
                   bool isMyPost = post['userId'] == widget.currentUserId;
 
                   return Dismissible(
@@ -2261,27 +2278,30 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 ),
                                                 // Kapatma butonu - Her zaman sağ üst köşede sabit
                                                 Positioned(
-                                                  top: MediaQuery.of(context).padding.top + 10,
-                                                  right: 20,
-                                                  child: Container(
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.black.withOpacity(0.7),
-                                                      borderRadius: BorderRadius.circular(20),
-                                                      boxShadow: [
-                                                        BoxShadow(
-                                                          color: Colors.black.withOpacity(0.3),
-                                                          blurRadius: 8,
-                                                          offset: const Offset(0, 2),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    child: IconButton(
-                                                      icon: const Icon(
-                                                        Icons.close,
-                                                        color: Colors.white,
-                                                        size: 24,
+                                                  top: 40,
+                                                  right: 15,
+                                                  child: SafeArea(
+                                                    child: Container(
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.black.withOpacity(0.8),
+                                                        borderRadius: BorderRadius.circular(22),
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: Colors.black.withOpacity(0.5),
+                                                            blurRadius: 10,
+                                                            offset: const Offset(0, 3),
+                                                          ),
+                                                        ],
                                                       ),
-                                                      onPressed: () => Navigator.of(context).pop(),
+                                                      child: IconButton(
+                                                        icon: const Icon(
+                                                          Icons.close,
+                                                          color: Colors.white,
+                                                          size: 26,
+                                                        ),
+                                                        onPressed: () => Navigator.of(context).pop(),
+                                                        splashRadius: 22,
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
@@ -2402,6 +2422,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         borderRadius: BorderRadius.circular(25),
                                         onTap: () => _toggleLike(
                                             post['id'], post['likes']),
+                                        onLongPress: () => _showLikesList(post['likes']),
                                         child: Padding(
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 16,
@@ -2440,18 +2461,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                                   fontSize: 12,
                                                 ),
                                               ),
-                                                const SizedBox(width: 8),
-                                                TextButton(
-                                                  style: TextButton.styleFrom(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                                                    minimumSize: Size(0, 24),
-                                                  ),
-                                                  onPressed: () => _showLikesList(post['likes']),
-                                                  child: const Text(
-                                                    'Beğenenleri Görüntüle',
-                                                    style: TextStyle(fontSize: 12, color: Color(0xFF2196F3)),
-                                                  ),
-                                                ),
                                             ],
                                           ),
                                         ),
@@ -3010,7 +3019,6 @@ class _CommentScreenState extends State<CommentScreen> {
                                                           fontWeight: FontWeight.bold,
                                                           fontSize: 16,
                                                           color: Color(0xFF2196F3),
-                                                          decoration: TextDecoration.underline,
                                                         ),
                                                       ),
                                                     ),
