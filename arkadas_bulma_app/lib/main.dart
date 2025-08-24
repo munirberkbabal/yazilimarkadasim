@@ -3222,6 +3222,16 @@ class _FriendsScreenState extends State<FriendsScreen> {
   List<dynamic> _friends = [];
   bool _isLoading = true;
 
+  // Base64 resim decode helper metodu
+  Uint8List _decodeBase64Image(String base64String) {
+    // data: prefix'lerini temizle
+    String cleanedBase64 = base64String;
+    if (base64String.contains(',')) {
+      cleanedBase64 = base64String.split(',').last;
+    }
+    return base64Decode(cleanedBase64);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -3286,10 +3296,10 @@ class _FriendsScreenState extends State<FriendsScreen> {
                           vertical: 4, horizontal: 8),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundImage: friend['profilePic'] != null
-                              ? MemoryImage(base64Decode(friend['profilePic']))
+                          backgroundImage: friend['profilePic'] != null && friend['profilePic'].isNotEmpty
+                              ? MemoryImage(_decodeBase64Image(friend['profilePic']))
                               : null,
-                          child: friend['profilePic'] == null
+                          child: friend['profilePic'] == null || friend['profilePic'].isEmpty
                               ? const Icon(Icons.person)
                               : null,
                         ),

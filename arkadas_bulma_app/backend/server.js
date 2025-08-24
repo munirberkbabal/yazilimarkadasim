@@ -696,25 +696,43 @@ app.get('/api/friend-requests/pending', authenticateToken, (req, res) => {
 
 // Kullanıcının Arkadaşlarını Getir
 app.get('/api/friends', authenticateToken, (req, res) => {
-    const userId = req.user.id;
-    const friendships = readData(friendshipsFilePath);
-    const users = readData(usersFilePath);
+    try {
+        const userId = req.user.id;
+        const friendships = readData(friendshipsFilePath);
+        const users = readData(usersFilePath);
 
-    const acceptedFriendships = friendships.filter(f =>
-        f.status === 'accepted' && (f.senderId === userId || f.receiverId === userId)
-    );
+        console.log('--- Friends Request Debug ---');
+        console.log('User ID:', userId);
+        console.log('All friendships:', JSON.stringify(friendships, null, 2));
 
-    const friendInfos = acceptedFriendships.map(f => {
-        const friendId = f.senderId === userId ? f.receiverId : f.senderId;
-        const friendUser = users.find(u => u.id === friendId);
-        if (friendUser) {
-            const { passwordHash, ...safeFriendUser } = friendUser;
-            return safeFriendUser;
-        }
-        return null;
-    }).filter(Boolean); // null olanları filtrele
+        const acceptedFriendships = friendships.filter(f =>
+            f.status === 'accepted' && (f.senderId === userId || f.receiverId === userId)
+        );
 
-    res.json(friendInfos);
+        console.log('Accepted friendships for this user:', acceptedFriendships);
+
+        const friendInfos = acceptedFriendships.map(f => {
+            const friendId = f.senderId === userId ? f.receiverId : f.senderId;
+            console.log('Looking for friend with ID:', friendId);
+            const friendUser = users.find(u => u.id === friendId);
+            if (friendUser) {
+                const { passwordHash, ...safeFriendUser } = friendUser;
+                console.log('Found friend:', safeFriendUser.username);
+                return safeFriendUser;
+            }
+            console.log('Friend user not found for ID:', friendId);
+            return null;
+        }).filter(Boolean); // null olanları filtrele
+
+        console.log('Final friend list:', friendInfos);
+        console.log('--- End Friends Debug ---');
+
+        res.setHeader('Content-Type', 'application/json');
+        res.json(friendInfos);
+    } catch (error) {
+        console.error('Error in /api/friends:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Tüm Kullanıcıları Getir (Arkadaş eklemek için arama)
